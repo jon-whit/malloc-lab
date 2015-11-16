@@ -45,9 +45,8 @@ team_t team = {
 
 #define WSIZE      4
 #define DSIZE      8
-#define CHUNKSIZE  16
 #define INITSIZE 16
-#define MINBLOCKSIZE 24
+#define MINBLOCKSIZE 16
 
 #define MAX(x, y) ((x) > (y)? (x) : (y))
 
@@ -101,12 +100,12 @@ static char *free_listp = 0;  /* Poitns to the frist free block */
 int mm_init(void)
 {
     /* Attempt to create an empty heap with the prologue and epilogue */
-    if ((heap_listp = mem_sbrk(2*MINBLOCKSIZE)) == (void *)-1)
+    if ((heap_listp = mem_sbrk(INITSIZE + MINBLOCKSIZE)) == (void *)-1)
         return -1; 
 
     PUT(heap_listp, 0);                                /* Alignment padding due to epilogue */
-    PUT(heap_listp + (1*WSIZE), PACK(MINBLOCKSIZE, 1));    /* Prologue header */ 
-    PUT(heap_listp + (2*WSIZE), PACK(MINBLOCKSIZE, 1));    /* Prologue footer */
+    PUT(heap_listp + (1*WSIZE), PACK(INITSIZE, 1));    /* Prologue header */ 
+    PUT(heap_listp + (2*WSIZE), PACK(INITSIZE, 1));    /* Prologue footer */
 
     PUT(heap_listp + (3*WSIZE), PACK(MINBLOCKSIZE, 0)); /* Free block header */
     PUT(heap_listp + (4*WSIZE), 0); /* Free block successor */
@@ -117,10 +116,10 @@ int mm_init(void)
 
 
     /* Initialize the explicit free list */
-    free_listp = heap_listp + (2*WSIZE);
+    free_listp = heap_listp + (4*WSIZE);
 
     /* Extend the empty heap with a free block of size bytes */
-    if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
+    if (extend_heap(MINBLOCKSIZE/WSIZE) == NULL)
         return -1;
 
     return 0;
