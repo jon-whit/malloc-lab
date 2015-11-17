@@ -179,10 +179,50 @@ void mm_free(void *bp)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
+    // If ptr is NULL, realloc is equivalent to mm_malloc(size)
+    if (ptr == NULL)
+        return mm_malloc(size);
 
+    // If size is equal to zero, realloc is equivalent to mm_free(ptr)
+    if (size == 0) {
+        mm_free(ptr);
+        return ptr;
+    }
 
+    char *bp = (char *) ptr;
 
-  return NULL;
+    /* Otherwise, we assume ptr is not NULL and was returned by an earlier malloc or realloc call.
+     * Get the size of the current payload */
+    size_t currsize = GET_SIZE(HDRP(bp)) - DSIZE;
+    
+    /* Case 2: Size is great than the current payload size */
+    if (size > currsize) {
+       // Allocate a new block with a payload of size bytes
+       bp = mm_malloc(size); 
+
+       // Copy the old contents at ptr to the first byte (bp) of the new payload 
+       memcpy(bp, ptr, currsize);
+
+       // Free the previous block
+       mm_free(ptr);
+    }
+
+    /* Case 3: Size is less than the current payload size */
+    else if (size < currsize) {
+       // Get the max between the requested size and the minimum block size 
+       size_t asize = MAX(size, MINBLOCKSIZE);
+
+       // Allocate a new block of the adjusted size
+       bp = mm_malloc(size);
+
+       // Copy the old contents at ptr to the first byte (bp) of the new payload
+       memcpy(bp, ptr, asize);
+
+       // Free the previous block
+       mm_free(ptr);
+    }
+
+    return bp;
 }
 
 /** BEGIN HELPER FUNCTIONS **/
