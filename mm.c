@@ -90,8 +90,6 @@ static char *free_listp = 0;  /* Poitns to the frist free block */
  *
  */ 
 
-
-
 /* 
  * mm_init - Initializes the heap like that shown below..
  *  _____________                                                   _____________
