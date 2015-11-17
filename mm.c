@@ -1,6 +1,43 @@
 /*
- * This solution uses a single explicit free list to manage allocation
- * and freeing of memory.  
+ * malloclab - Implemented with an explicit free list allocator to manage allocation of and
+ * freeing of memory.  
+ *
+ * Block structures:
+ * An explicit list uses the payload to embed pointers to the previous and next free blocks
+ * within a free block. The free and allocated block organizations are shown below:
+ *
+ * Allocated Block          Free Block
+ *  ---------               ---------
+ * | HEADER  |             | HEADER  |
+ *  ---------               ---------
+ * |         |             |  NEXT   |
+ * |         |              ---------
+ * | PAYLOAD |             |  PREV   |
+ * |         |              ---------
+ * |         |             |         |
+ *  ---------              |         |
+ * | FOOTER  |              ---------
+ *  ---------              | FOOTER  |
+ *                          ---------
+ * 
+ * Free list organization:
+ * Free blocks on the heap are organized using an explicit free list with the head of the list being 
+ * pointed to by a pointer free_listp (see diagram below in mm_init). Each free block contains two 
+ * pointers, one pointing to the next free block, and one pointing to the previous free block. The 
+ * minimum payload for a free block must be 8 bytes to support the two pointers. The overall size 
+ * of a free block is then 16 bytes, which includes the 4 byte header and 4 byte footer. 
+ *
+ * Free list manipulation:
+ * The free list is maintained as a doubly linked list. Free blocks are removed using a doubly linked
+ * list removal strategy and then coalesced to merge any adjacent free blocks. Free blocks are added
+ * to the list using a LIFO insertion policy. Each free block is added to the front of the free list. 
+ * For more information on how the free list is modified, see the functions 'remove_freeblock' and
+ * 'coalesce'.
+ *
+ *
+ * Authors:
+ * (1) Jonathan Whitaker
+ * (2) Daniel Rushton
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,20 +107,13 @@ static char *heap_listp = 0;  /* Points to the start of the heap */
 static char *free_listp = 0;  /* Poitns to the frist free block */
 
 
-/*  Free blocks on the heap are organized in an explicit free list which is
- *  always pointed to by free_listp. Each free block contains two pointers 
- *  pointing to the next free block and the previous free block. Thus the minimum
- *  payload for a free block must be 8 bytes to support the two pointers. The overall
- *  size of a free block is then 16 bytes including the 4 byte header and 4 byte footer.
- *  The heap_listp maintains a 4 byte prologue and 4 byte epilogue. 
- */
 
 /* 
  * mm_init - Initializes the heap like that shown below.
- *  _____________                                                   _____________
+ *  ____________                                                    _____________
  * |  PROLOGUE  |                8+ bytes or 2 ptrs                |   EPILOGUE  |
  * |------------|------------|-----------|------------|------------|-------------|
- * |    HEADER  |   HEADER   |        PAYLOAD         |   FOOTER   |    HEADER   |
+ * |   HEADER   |   HEADER   |        PAYLOAD         |   FOOTER   |    HEADER   |
  * |------------|------------|-----------|------------|------------|-------------|
  * ^            ^            ^       
  * heap_listp   free_listp   bp 
