@@ -234,24 +234,27 @@ void *mm_realloc(void *ptr, size_t size)
     if (asize > oldsize) {
 
        // Coalesce with the next block if it is unallocated
-       if (!GET_ALLOC(HDRP(NEXT_BLKP(ptr)))) {
+       if (!GET_ALLOC(HDRP(NEXT_BLKP(ptr))) && NEXT_BLKP(ptr) <= mem_heap_hi()) {
            size_t newsize = GET_SIZE(HDRP(ptr)) + GET_SIZE(HDRP(NEXT_BLKP(ptr)));
+           if (NEXT_BLKP(ptr) >= mem_heap_hi() || FTRP(NEXT_BLKP(ptr)))
+               printf("STARTHEAP (%p) - ENDHEAP(%p) ----- PAYLOADBEGIN (%p) - PAYLOADEND (%p)\n", mem_heap_lo(), mem_heap_hi(), NEXT_BLKP(ptr), FTRP(NEXT_BLKP(ptr)));
            remove_freeblock(NEXT_BLKP(ptr));
+           printf("newsize (%lu) asize (%lu)\n", newsize, asize);
 
+           /* If the difference between the merged block and the requested block is
+            * larger than the minimum block size, then split the block into two parts. 
+            */
            if (newsize - asize >= (MINBLOCKSIZE)) {
                PUT(HDRP(ptr), PACK(asize, 1));
                PUT(FTRP(ptr), PACK(asize, 1));
-               bp = NEXT_BLKP(ptr);
+               bp = ptr + asize;
                PUT(HDRP(bp), PACK(newsize-asize, 0));
                PUT(FTRP(bp), PACK(newsize-asize, 0));
-                 
-               // Insert the remaining free block at the beginning of the free list
-               NEXT_FREE(bp) = free_listp;
-               PREV_FREE(free_listp) = bp;
-               PREV_FREE(bp) = NULL;
-               free_listp = bp;
+               coalesce(bp); 
            } 
 
+           /* Otherwise, if the difference between the merged block and requested block is not
+            * larger than or equal to the minimum block size, then place the full block */
            else {
                PUT(HDRP(ptr), PACK(newsize, 1));
                PUT(FTRP(ptr), PACK(newsize, 1));
@@ -263,6 +266,9 @@ void *mm_realloc(void *ptr, size_t size)
            // Allocate a new block with a payload of size bytes
            bp = mm_malloc(asize); 
            
+           if (bp == NULL)
+               return NULL; 
+
            // Copy the old contents at ptr to the first byte (bp) of the new payload 
            memcpy(bp, ptr, oldsize);
 
@@ -277,6 +283,8 @@ void *mm_realloc(void *ptr, size_t size)
 
        // Allocate a new block of the adjusted size
        bp = mm_malloc(asize);
+       if (bp == NULL)
+           return NULL;
        
        // Copy the old contents at ptr to the first byte (bp) of the new payload
        memcpy(bp, ptr, asize);
