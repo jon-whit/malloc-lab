@@ -219,32 +219,65 @@ void *mm_realloc(void *ptr, size_t size)
         return ptr;
     }
 
-    char *bp = (char *) ptr;
-
     /* Otherwise, we assume ptr is not NULL and was returned by an earlier malloc or realloc call.
      * Get the size of the current payload */
-    size_t currsize = GET_SIZE(HDRP(bp)) - DSIZE;
-    
-    /* Case 2: Size is great than the current payload size */
-    if (size > currsize) {
-       // Allocate a new block with a payload of size bytes
-       bp = mm_malloc(size); 
+    size_t asize = MAX(ALIGN(size) + DSIZE, MINBLOCKSIZE);
+    size_t oldsize = GET_SIZE(HDRP(ptr));
 
-       // Copy the old contents at ptr to the first byte (bp) of the new payload 
-       memcpy(bp, ptr, currsize);
+    /* Case 1: Size is equal to the current payload size */
+    if (asize == oldsize)
+        return ptr;
 
-       // Free the previous block
-       mm_free(ptr);
+    void *bp;        
+
+    /* Case 2: Size is greater than the current payload size */
+    if (asize > oldsize) {
+
+       // Coalesce with the next block if it is unallocated
+       if (!GET_ALLOC(HDRP(NEXT_BLKP(ptr)))) {
+           size_t newsize = GET_SIZE(HDRP(ptr)) + GET_SIZE(HDRP(NEXT_BLKP(ptr)));
+           remove_freeblock(NEXT_BLKP(ptr));
+
+           if (newsize - asize >= (MINBLOCKSIZE)) {
+               PUT(HDRP(ptr), PACK(asize, 1));
+               PUT(FTRP(ptr), PACK(asize, 1));
+               bp = NEXT_BLKP(ptr);
+               PUT(HDRP(bp), PACK(newsize-asize, 0));
+               PUT(FTRP(bp), PACK(newsize-asize, 0));
+                 
+               // Insert the remaining free block at the beginning of the free list
+               NEXT_FREE(bp) = free_listp;
+               PREV_FREE(free_listp) = bp;
+               PREV_FREE(bp) = NULL;
+               free_listp = bp;
+           } 
+
+           else {
+               PUT(HDRP(ptr), PACK(newsize, 1));
+               PUT(FTRP(ptr), PACK(newsize, 1));
+           }
+
+           return ptr;
+       }  
+       else { 
+           // Allocate a new block with a payload of size bytes
+           bp = mm_malloc(asize); 
+           
+           // Copy the old contents at ptr to the first byte (bp) of the new payload 
+           memcpy(bp, ptr, oldsize);
+
+           // Free the previous block
+           mm_free(ptr);
+           return bp;
+       }
     }
 
     /* Case 3: Size is less than the current payload size */
-    else if (size < currsize) {
-       // Get the max between the requested size and the minimum block size 
-       size_t asize = MAX(size, MINBLOCKSIZE);
+    else {
 
        // Allocate a new block of the adjusted size
-       bp = mm_malloc(size);
-
+       bp = mm_malloc(asize);
+       
        // Copy the old contents at ptr to the first byte (bp) of the new payload
        memcpy(bp, ptr, asize);
 
@@ -344,7 +377,7 @@ static void *coalesce(void *bp)
   /* If the next block is free, then coalesce the current block
    * (bp) and the next block */
   if (prev_alloc && !next_alloc) {           // Case 2 (in text) 
-    size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+    size += GET_SIZE(HDRP(NEXT_BLKP(bp)));  
     remove_freeblock(NEXT_BLKP(bp));
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
