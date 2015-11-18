@@ -250,15 +250,11 @@ void *mm_realloc(void *ptr, size_t size)
       
         bp = NEXT_BLKP(ptr);
       
-        PUT(HDRP(bp), PACK(newsize-asize, 0));
-        PUT(FTRP(bp), PACK(newsize-asize, 0));
-         
-        // Insert the remaining free block at the beginning of the free list
-        NEXT_FREE(bp) = free_listp;
-        PREV_FREE(free_listp) = bp;
-        PREV_FREE(bp) = NULL;
-        free_listp = bp;
-        
+        PUT(HDRP(bp), PACK(newsize-asize, 1));
+        PUT(FTRP(bp), PACK(newsize-asize, 1));
+
+        mm_free(bp);
+
         return ptr;
       }  
       else { 
@@ -272,15 +268,29 @@ void *mm_realloc(void *ptr, size_t size)
         // Free the previous block
         mm_free(ptr);
         return bp;
-       }
+      }
 
 
     }
 
     /* Case 3: Size is less than the current payload size */
-    else {
+    else if ( asize < oldsize ){
 
-       // Allocate a new block of the adjusted size
+      // PUT(HDRP(ptr), PACK(asize, 1));
+      // PUT(FTRP(ptr), PACK(asize, 1));
+      
+      // bp = ptr + NEXT_BLKP(bp);
+      
+      // PUT(HDRP(bp), PACK(oldsize-asize, 0));
+      // PUT(FTRP(bp), PACK(oldsize-asize, 0));
+
+      // mm_free(bp);
+
+
+      // return ptr;
+
+      // Allocate a new block of the adjusted size
+
        bp = mm_malloc(asize);
        
        // Copy the old contents at ptr to the first byte (bp) of the new payload
@@ -288,6 +298,7 @@ void *mm_realloc(void *ptr, size_t size)
 
        // Free the previous block
        mm_free(ptr);
+
     }
 
     return bp;
@@ -357,7 +368,8 @@ static void remove_freeblock(void *bp)
       NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
   else
       free_listp = NEXT_FREE(bp);
-  PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
+  if(NEXT_FREE(bp) != NULL)
+    PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
 }
 
 
