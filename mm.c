@@ -222,16 +222,14 @@ void *mm_realloc(void *ptr, size_t size)
    * Get the size of the current payload */
   size_t asize = MAX(ALIGN(size) + DSIZE, MINBLOCKSIZE);
   size_t current_size = GET_SIZE(HDRP(ptr));
-  size_t newsize = current_size + GET_SIZE(next);
-  
+
   void *bp;
   char *next = HDRP(NEXT_BLKP(ptr));
-  
-  // Case 1: Size is equal to the current payload size
+  size_t newsize = current_size + GET_SIZE(next);
+
+  /* Case 1: Size is equal to the current payload size */
   if (asize == current_size)
     return ptr;
-
-
 
   // Case 2: Size is less than the current payload size 
   if ( asize <= current_size ) {
@@ -240,10 +238,9 @@ void *mm_realloc(void *ptr, size_t size)
     bp = mm_malloc(asize);
     memcpy(bp, ptr, asize);
     mm_free(ptr);
+
     return bp;
   }
-
-
 
   // Case 3: Requested size is greater than the current payload size 
   else {
@@ -271,9 +268,8 @@ void *mm_realloc(void *ptr, size_t size)
       mm_free(ptr);
       return bp;
     }
+
   }
-
-
 
 }
 
