@@ -100,6 +100,7 @@ static void *find_fit(size_t size);
 static void *coalesce(void *bp);
 static void place(void *bp, size_t asize);
 static void remove_freeblock(void *bp);
+static int mm_check();
 
 
 // Private variables represeneting the heap and free list within the heap
@@ -176,6 +177,7 @@ void *mm_malloc(size_t size)
 
   // Place the newly allocated block
   place(bp, asize);
+
   return bp;
 }
 
@@ -188,6 +190,8 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *bp)
 { 
+  mm_check();
+
   // Ignore spurious requests 
   if (!bp)
       return;
@@ -316,10 +320,10 @@ static void *find_fit(size_t size)
 
   /* Iterate through the free list and try to find a free block
    * large enough */
-  for (bp = free_listp; GET_ALLOC(HDRP(bp)) == 0; bp = NEXT_FREE(bp)) 
+  for (bp = free_listp; GET_ALLOC(HDRP(bp)) == 0; bp = NEXT_FREE(bp)) {
     if (size <= GET_SIZE(HDRP(bp))) 
       return bp; 
-
+  }
   // Otherwise no free block was large enough
   return NULL; 
 }
@@ -437,6 +441,50 @@ static void place(void *bp, size_t asize)
     PUT(FTRP(bp), PACK(fsize, 1));
     remove_freeblock(bp);
   }
+}
+
+// consistency checker
+
+static int mm_check() {
+
+  // Is every block in the free list marked as free?
+  void *next;
+  for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
+    if (GET_ALLOC(HDRP(next))) {
+      printf("Consistency error: block %p in free list but marked allocated!", next);
+      return 1;
+    }
+  }
+
+  // Are there any contiguous free blocks that escaped coalescing?
+  for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
+
+    char *prev = PREV_FREE(HDRP(next));
+      if(prev != NULL && HDRP(next) - FTRP(prev) == DSIZE) {
+        printf("Consistency error: block %p missed coalescing!", next);
+        return 1;
+      }
+  }
+
+  // Do the pointers in the free list point to valid free blocks?
+  for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
+
+    if(next < mem_heap_lo() || next > mem_heap_hi()) {
+      printf("Consistency error: free block %p invalid", next);
+      return 1;
+    }
+  }
+
+  // Do the pointers in a heap block point to a valid heap address?
+  for (next = heap_listp; NEXT_BLKP(next) != NULL; next = NEXT_BLKP(next)) {
+
+    if(next < mem_heap_lo() || next > mem_heap_hi()) {
+      printf("Consistency error: block %p outside designated heap space", next);
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 

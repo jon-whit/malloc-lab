@@ -5,7 +5,7 @@ TEAM = bovik
 VERSION = 1
 
 CC = gcc
-CFLAGS = -Wall -O -g -m32
+CFLAGS = -Wall -O2 -g -m32
 
 OBJS = mdriver.o mm.o memlib.o fsecs.o fcyc.o clock.o ftimer.o
 
@@ -24,3 +24,5 @@ clean:
 	rm -f *~ *.o mdriver
 
 
+debug:
+	CFLAGS = -Wall -O -g -m32
