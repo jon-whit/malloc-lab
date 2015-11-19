@@ -190,8 +190,7 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *bp)
 { 
-  mm_check();
-
+  
   // Ignore spurious requests 
   if (!bp)
       return;
