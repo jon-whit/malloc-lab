@@ -88,6 +88,7 @@ team_t team = {
 #define GET_ALLOC(p) (GET(p) & 0x1)
 #define HDRP(bp)     ((void *)(bp) - WSIZE)
 #define FTRP(bp)     ((void *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
+
 #define NEXT_BLKP(bp) ((void *)(bp) + GET_SIZE(HDRP(bp)))
 #define PREV_BLKP(bp) ((void *)(bp) - GET_SIZE(HDRP(bp) - WSIZE))
 #define NEXT_FREE(bp)(*(void **)(bp))
@@ -100,7 +101,7 @@ static void *find_fit(size_t size);
 static void *coalesce(void *bp);
 static void place(void *bp, size_t asize);
 static void remove_freeblock(void *bp);
-static int mm_check();
+// static int mm_check();
 
 
 // Private variables represeneting the heap and free list within the heap
@@ -237,11 +238,21 @@ void *mm_realloc(void *ptr, size_t size)
   // Case 2: Size is less than the current payload size 
   if ( asize <= current_size ) {
 
+    if( asize > MINBLOCKSIZE && (current_size - asize) > MINBLOCKSIZE) {  
+
+      PUT(HDRP(ptr), PACK(asize, 1));
+      PUT(FTRP(ptr), PACK(asize, 1));
+      bp = NEXT_BLKP(ptr);
+      PUT(HDRP(bp), PACK(current_size - asize, 1));
+      PUT(FTRP(bp), PACK(current_size - asize, 1));
+      mm_free(bp);
+      return ptr;
+    }
+
     // allocate a new block of the requested size and release the current block
     bp = mm_malloc(asize);
     memcpy(bp, ptr, asize);
     mm_free(ptr);
-
     return bp;
   }
 
@@ -263,15 +274,12 @@ void *mm_realloc(void *ptr, size_t size)
       mm_free(bp);
       return ptr;
     }  
-    else { 
-
-      // allocate a new block of the requested size and release the current block
-      bp = mm_malloc(asize); 
-      memcpy(bp, ptr, current_size);
-      mm_free(ptr);
-      return bp;
-    }
-
+    
+    // otherwise allocate a new block of the requested size and release the current block
+    bp = mm_malloc(asize); 
+    memcpy(bp, ptr, current_size);
+    mm_free(ptr);
+    return bp;
   }
 
 }
@@ -430,7 +438,6 @@ static void place(void *bp, size_t asize)
     PUT(HDRP(bp), PACK(fsize-asize, 0));
     PUT(FTRP(bp), PACK(fsize-asize, 0));
     coalesce(bp);
-
   }
 
   // Case 2: Splitting not possible. Use the full free block 
@@ -444,47 +451,47 @@ static void place(void *bp, size_t asize)
 
 // consistency checker
 
-static int mm_check() {
+// static int mm_check() {
 
-  // Is every block in the free list marked as free?
-  void *next;
-  for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
-    if (GET_ALLOC(HDRP(next))) {
-      printf("Consistency error: block %p in free list but marked allocated!", next);
-      return 1;
-    }
-  }
+//   // Is every block in the free list marked as free?
+//   void *next;
+//   for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
+//     if (GET_ALLOC(HDRP(next))) {
+//       printf("Consistency error: block %p in free list but marked allocated!", next);
+//       return 1;
+//     }
+//   }
 
-  // Are there any contiguous free blocks that escaped coalescing?
-  for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
+//   // Are there any contiguous free blocks that escaped coalescing?
+//   for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
 
-    char *prev = PREV_FREE(HDRP(next));
-      if(prev != NULL && HDRP(next) - FTRP(prev) == DSIZE) {
-        printf("Consistency error: block %p missed coalescing!", next);
-        return 1;
-      }
-  }
+//     char *prev = PREV_FREE(HDRP(next));
+//       if(prev != NULL && HDRP(next) - FTRP(prev) == DSIZE) {
+//         printf("Consistency error: block %p missed coalescing!", next);
+//         return 1;
+//       }
+//   }
 
-  // Do the pointers in the free list point to valid free blocks?
-  for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
+//   // Do the pointers in the free list point to valid free blocks?
+//   for (next = free_listp; GET_ALLOC(HDRP(next)) == 0; next = NEXT_FREE(next)) {
 
-    if(next < mem_heap_lo() || next > mem_heap_hi()) {
-      printf("Consistency error: free block %p invalid", next);
-      return 1;
-    }
-  }
+//     if(next < mem_heap_lo() || next > mem_heap_hi()) {
+//       printf("Consistency error: free block %p invalid", next);
+//       return 1;
+//     }
+//   }
 
-  // Do the pointers in a heap block point to a valid heap address?
-  for (next = heap_listp; NEXT_BLKP(next) != NULL; next = NEXT_BLKP(next)) {
+//   // Do the pointers in a heap block point to a valid heap address?
+//   for (next = heap_listp; NEXT_BLKP(next) != NULL; next = NEXT_BLKP(next)) {
 
-    if(next < mem_heap_lo() || next > mem_heap_hi()) {
-      printf("Consistency error: block %p outside designated heap space", next);
-      return 1;
-    }
-  }
+//     if(next < mem_heap_lo() || next > mem_heap_hi()) {
+//       printf("Consistency error: block %p outside designated heap space", next);
+//       return 1;
+//     }
+//   }
 
-  return 0;
-}
+//   return 0;
+// }
 
 
 
